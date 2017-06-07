@@ -349,6 +349,179 @@ namespace quda {
       return a;
     }
 
+    /**
+       return gamma_\mu times self.
+       @param in mu
+       @param return gamma_\mu times self. 
+
+       gamma(0) =  0  0  0  i
+                     0 0  i  0
+         0  -i  0  0
+         -i  0  0 0
+
+       gamma(1) =  0 0  0  1
+                     0  0  -1  0
+         0  -1  0 0
+         1  0  0  0
+
+       gamma(2) =  0  0  i 0
+                     0  0 0  -i
+         -i 0  0  0
+        0  i  0  0
+
+       gamma(3) =  1  0  0  0
+                     0  1  0  0
+         0  0  -1  0
+         0  0  0  -1
+
+       gamma(5) =  0  0  1  0
+                     0  0  0  1
+         1 0  0  0
+         0  1  0  0
+    */
+    __device__ __host__ inline ColorSpinor<Float,Nc,4> gamma(int mu)
+    {
+      ColorSpinor<Float,Nc,4> a;
+      ColorSpinor<Float,Nc,4> &b = *this;
+      complex<Float> j(0.0,1.0);
+
+      switch (mu)
+      {
+        case 0:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(0,i) = j*b(3,i);
+            a(1,i) = j*b(2,i);
+            a(2,i) = -j*b(1,i);
+            a(3,i) = -j*b(0,i);
+          }
+          break;
+        case 1:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(0,i) = b(3,i);
+            a(1,i) = -b(2,i);
+            a(2,i) = -b(1,i);
+            a(3,i) = b(0,i);
+          }
+          break;
+        case 2:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(0,i) = j*b(2,i);
+            a(1,i) = -j*b(3,i);
+            a(2,i) = -j*b(0,i);
+            a(3,i) = j*b(1,i);
+          }
+          break;
+        case 3:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(0,i) = b(0,i);
+            a(1,i) = b(1,i);
+            a(2,i) = -b(2,i);
+            a(3,i) = -b(3,i);
+          }
+          break;
+        case 5:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(0,i) = b(2,i);
+            a(1,i) = b(3,i);
+            a(2,i) = b(0,i);
+            a(3,i) = b(1,i);
+          }
+          break;
+      }
+
+      return a;
+    }
+
+    /**
+       Multiply self by gamma_\mu
+       @param in mu
+       @param return reference to self
+
+       gamma(0) =  0  0  0  i
+                     0 0  i  0
+         0  -i  0  0
+         -i  0  0 0
+
+       gamma(1) =  0 0  0  1
+                     0  0  -1  0
+         0  -1  0 0
+         1  0  0  0
+
+       gamma(2) =  0  0  i 0
+                     0  0 0  -i
+         -i 0  0  0
+        0  i  0  0
+
+       gamma(3) =  1  0  0  0
+                     0  1  0  0
+         0  0  -1  0
+         0  0  0  -1
+
+       gamma(5) =  0  0  1  0
+                     0  0  0  1
+         1 0  0  0
+         0  1  0  0
+    */
+    __device__ __host__ inline ColorSpinor<Float,Nc,4>& gamma_self(int mu)
+    {
+      ColorSpinor<Float,Nc,4> &a = *this;
+      complex<Float> j(0.0,1.0);
+
+      switch (mu)
+      {
+        case 0:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(3,i));
+            a(0,i) *= j;
+            a(3,i) *= -j;
+            std::swap(a(1,i),a(2,i));
+            a(1,i) *= j;
+            a(2,i) *= -j;
+          }
+          break;
+        case 1:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(3,i));
+            a(1,i) *= -1.0;
+            std::swap(a(1,i),a(2,i));
+            a(2,i) *= -1.0;
+          }
+          break;
+        case 2:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(2,i));
+            a(0,i) *= j;
+            a(2,i) *= -j;
+            std::swap(a(1,i),a(3,i));
+            a(1,i) *= -j;
+            a(3,i) *= j;
+          }
+          break;
+        case 3:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(2,i) *= -1.0;
+            a(3,i) *= -1.0;
+          }
+          break;
+        case 5:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(2,i));
+            std::swap(a(1,i),a(3,i));
+          }
+          break;
+      }
+    }
+
 
     /**
        Accessor functor
@@ -508,6 +681,53 @@ namespace quda {
 	break;
       }
       return recon;
+    }
+
+    /**
+       Multiply self by gamma_\mu (really pauli matrix)
+       @param in mu
+       @param return reference to self
+
+       gamma(1) =  0 1
+                     1 0
+
+       gamma(2) =  0  -I
+                     I  0
+
+       gamma(3) =  1 0
+                     0  -1
+
+       gamma(5) =  gamma(3)
+    */
+    __device__ __host__ inline ColorSpinor<Float,Nc,4>& gamma_self(int mu)
+    {
+      ColorSpinor<Float,Nc,2> &a = *this;
+      complex<Float> j(0.0,1.0);
+
+      switch (mu)
+      {
+        case 1:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(1,i));
+          }
+          break;
+        case 2:
+          for (int i = 0; i < Nc; i++)
+          {
+            std::swap(a(0,i),a(1,i));
+            a(0,i) *= -j;
+            a(1,i) *= j;
+          }
+          break;
+        case 3:
+        case 5:
+          for (int i = 0; i < Nc; i++)
+          {
+            a(1,i) *= -1.0;
+          }
+          break;
+      }
     }
 
     /**
