@@ -102,6 +102,10 @@ namespace quda {
     void compute(const cudaGaugeField &gauge);
 
 #ifdef USE_TEXTURE_OBJECTS
+    cudaTextureObject_t tex;
+    cudaTextureObject_t normTex;
+    cudaTextureObject_t invTex;
+    cudaTextureObject_t invNormTex;
     cudaTextureObject_t evenTex;
     cudaTextureObject_t evenNormTex;
     cudaTextureObject_t oddTex;
@@ -110,7 +114,7 @@ namespace quda {
     cudaTextureObject_t evenInvNormTex;
     cudaTextureObject_t oddInvTex;
     cudaTextureObject_t oddInvNormTex;
-    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm);
+    void createTexObject(cudaTextureObject_t &tex, cudaTextureObject_t &texNorm, void *field, void *norm, bool full);
     void destroyTexObject();
 #endif
 
@@ -121,6 +125,10 @@ namespace quda {
     virtual ~cudaCloverField();
 
 #ifdef USE_TEXTURE_OBJECTS
+    const cudaTextureObject_t& Tex() const { return tex; }
+    const cudaTextureObject_t& NormTex() const { return normTex; }
+    const cudaTextureObject_t& InvTex() const { return invTex; }
+    const cudaTextureObject_t& InvNormTex() const { return invNormTex; }
     const cudaTextureObject_t& EvenTex() const { return evenTex; }
     const cudaTextureObject_t& EvenNormTex() const { return evenNormTex; }
     const cudaTextureObject_t& OddTex() const { return oddTex; }
@@ -132,8 +140,9 @@ namespace quda {
 #endif
 
     /**
-       Copy into this CloverField from the generic CloverField src
+       @brief Copy into this CloverField from the generic CloverField src
        @param src The clover field from which we want to copy
+       @param inverse Are we copying the inverse or direct field
      */
     void copy(const CloverField &src, bool inverse=true);
 
@@ -245,8 +254,8 @@ namespace quda {
      @param outNorm The output norm buffer (optional)
      @param inNorm The input norm buffer (optional)
   */
-  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse, QudaFieldLocation location,
-			 void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
+  void copyGenericClover(CloverField &out, const CloverField &in, bool inverse,
+			 QudaFieldLocation location, void *Out=0, void *In=0, void *outNorm=0, void *inNorm=0);
   
 
 
@@ -259,6 +268,14 @@ namespace quda {
      @param location The location of the field
   */
   void cloverInvert(CloverField &clover, bool computeTraceLog, QudaFieldLocation location);
+
+  /**
+     @brief This function adds a real scalar onto the clover diagonal (only to the direct field not the inverse)
+
+     @param clover The clover field
+     @param rho Real scalar to be added on
+  */
+  void cloverRho(CloverField &clover, double rho);
 
   /**
      @brief Compute the force contribution from the solver solution fields

@@ -314,6 +314,10 @@ namespace quda {
     /** The type of allocation we are going to do for this field */
     QudaMemoryType mem_type;
 
+    mutable char *backup_h;
+    mutable char *backup_norm_h;
+    mutable bool backed_up;
+
   public:
 
     /**
@@ -492,6 +496,12 @@ namespace quda {
 
     /** Return the volume string used by the autotuner */
     inline const char *VolString() const { return vol_string; }
+
+    /** @brief Backs up the LatticeField */
+    virtual void backup() const { errorQuda("Not implemented"); }
+
+    /** @brief Restores the cpuGaugeField */
+    virtual void restore() { errorQuda("Not implemented"); }
   };
   
   /**
@@ -500,10 +510,12 @@ namespace quda {
      @param[in] b Input field
      @return If location is unique return the location
    */
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b) {
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
+				     const LatticeField &a, const LatticeField &b) {
     QudaFieldLocation location = QUDA_INVALID_FIELD_LOCATION;
     if (a.Location() == b.Location()) location = a.Location();
-    else errorQuda("Locations %d %d do not match", a.Location(), b.Location());
+    else errorQuda("Locations %d %d do not match  (%s:%d in %s())\n",
+		   a.Location(), b.Location(), file, line, func);
     return location;
   }
 
@@ -515,9 +527,12 @@ namespace quda {
      @return If location is unique return the location
    */
   template <typename... Args>
-  inline QudaFieldLocation Location(const LatticeField &a, const LatticeField &b, const Args &... args) {
-    return static_cast<QudaFieldLocation>(Location(a,b) & Location(a,args...));
+  inline QudaFieldLocation Location_(const char *func, const char *file, int line,
+				     const LatticeField &a, const LatticeField &b, const Args &... args) {
+    return static_cast<QudaFieldLocation>(Location_(func,file,line,a,b) & Location_(func,file,line,a,args...));
   }
+
+#define checkLocation(...)Location_(__func__, __FILE__, __LINE__, __VA_ARGS__)
 
   /**
      @brief Helper function for determining if the precision of the fields is the same.
@@ -525,10 +540,12 @@ namespace quda {
      @param[in] b Input field
      @return If precision is unique return the precision
    */
-  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b) {
+  inline QudaPrecision Precision_(const char *func, const char *file, int line,
+				  const LatticeField &a, const LatticeField &b) {
     QudaPrecision precision = QUDA_INVALID_PRECISION;
     if (a.Precision() == b.Precision()) precision = a.Precision();
-    else errorQuda("Precisions %d %d do not match", a.Precision(), b.Precision());
+    else errorQuda("Precisions %d %d do not match (%s:%d in %s())\n",
+		   a.Precision(), b.Precision(), file, line, func);
     return precision;
   }
 
@@ -540,12 +557,16 @@ namespace quda {
      @return If precision is unique return the precision
    */
   template <typename... Args>
-  inline QudaPrecision Precision(const LatticeField &a, const LatticeField &b, const Args &... args) {
-    return static_cast<QudaPrecision>(Precision(a,b) & Precision(a,args...));
+  inline QudaPrecision Precision_(const char *func, const char *file, int line,
+				  const LatticeField &a, const LatticeField &b,
+				  const Args &... args) {
+    return static_cast<QudaPrecision>(Precision_(func,file,line,a,b) & Precision_(func,file,line,a,args...));
   }
 
+#define checkPrecision(...) Precision_(__func__, __FILE__, __LINE__, __VA_ARGS__)
+
   /**
-     @brief Return whether data is reorderd on the CPU or GPU.  This can set
+     @brief Return whether data is reordered on the CPU or GPU.  This can set
      at QUDA initialization using the environment variable
      QUDA_REORDER_LOCATION.
      @return Reorder location

@@ -11,12 +11,6 @@
 #include <face_quda.h>
 #include <dslash_quda.h>
 
-#ifdef DEVICE_PACK
-static const QudaFieldLocation reorder_location_ = QUDA_CUDA_FIELD_LOCATION;
-#else
-static const QudaFieldLocation reorder_location_ = QUDA_CPU_FIELD_LOCATION;
-#endif
-
 int zeroCopy = 0;
 
 namespace quda {
@@ -497,6 +491,30 @@ namespace quda {
 
   }
 
+  void cudaColorSpinorField::backup() const {
+    if (backed_up) errorQuda("Gauge field already backed up");
+    backup_h = new char[bytes];
+    cudaMemcpy(backup_h, v, bytes, cudaMemcpyDeviceToHost);
+    if (norm_bytes) {
+      backup_norm_h = new char[norm_bytes];
+      cudaMemcpy(backup_norm_h, norm, norm_bytes, cudaMemcpyDeviceToHost);
+    }
+    checkCudaError();
+    backed_up = true;
+  }
+
+  void cudaColorSpinorField::restore() {
+    if (!backed_up) errorQuda("Cannot restore since not backed up");
+    cudaMemcpy(v, backup_h, bytes, cudaMemcpyHostToDevice);
+    delete []backup_h;
+    if (norm_bytes) {
+      cudaMemcpy(v, backup_norm_h, norm_bytes, cudaMemcpyHostToDevice);
+      delete []backup_norm_h;
+    }
+    checkCudaError();
+    backed_up = false;
+  }
+
   // cuda's floating point format, IEEE-754, represents the floating point
   // zero as 4 zero bytes
   void cudaColorSpinorField::zero() {
@@ -546,7 +564,7 @@ namespace quda {
 
   void cudaColorSpinorField::loadSpinorField(const ColorSpinorField &src) {
 
-    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
+    if (reorder_location() == QUDA_CPU_FIELD_LOCATION &&typeid(src) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes + norm_bytes);
       memset(buffer, 0, bytes+norm_bytes); // FIXME (temporary?) bug fix for padding
 
@@ -587,7 +605,7 @@ namespace quda {
 
   void cudaColorSpinorField::saveSpinorField(ColorSpinorField &dest) const {
 
-    if (reorder_location_ == QUDA_CPU_FIELD_LOCATION &&	typeid(dest) == typeid(cpuColorSpinorField)) {
+    if (reorder_location() == QUDA_CPU_FIELD_LOCATION && typeid(dest) == typeid(cpuColorSpinorField)) {
       void *buffer = pool_pinned_malloc(bytes+norm_bytes);
       qudaMemcpy(buffer, v, bytes, cudaMemcpyDeviceToHost);
       qudaMemcpy(static_cast<char*>(buffer)+bytes, norm, norm_bytes, cudaMemcpyDeviceToHost);
@@ -1462,7 +1480,7 @@ namespace quda {
       if (halo_location[2*d+0] == Host || halo_location[2*d+1] == Host) halo_host = true;
     }
 
-    genericPackGhost(send, *this, parity, dagger, pack_destination); // FIXME - need support for asymmetric topologies
+    genericPackGhost(send, *this, parity, nFace, dagger, pack_destination); // FIXME - need support for asymmetric topologies
 
     size_t total_bytes = 0;
     for (int i=0; i<nDimComms; i++) if (comm_dim_partitioned(i)) total_bytes += 2*ghost_face_bytes[i]; // 2 for fwd/bwd
